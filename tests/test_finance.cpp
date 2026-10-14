@@ -94,6 +94,19 @@ void testRq4_RecurringScheduler() {
     assert(acc != nullptr);
     assert(acc->getBalance() == 4500000.0);
 
+    // Chay lai cung ky khong duoc ghi trung hay tru tien them.
+    assert(fm.executeRecurringExpensesForMonth(2026, 10) == 0);
+    assert(fm.findAccount("Bank")->getBalance() == 4500000.0);
+
+    FinanceManager edgeCases;
+    edgeCases.addAccount("Bank", 1000000.0);
+    edgeCases.addTransaction(make_unique<RecurringExpense>(1, "2026-01-31", 100000.0,
+        "Tien nha", "Bank", "Ngay 31", "Monthly", 31));
+    edgeCases.addTransaction(make_unique<RecurringExpense>(2, "2026-01-10", 100000.0,
+        "Bao hiem", "Bank", "Hang nam", "Yearly", 10));
+    assert(edgeCases.executeRecurringExpensesForMonth(2026, 2) == 1);
+    assert(edgeCases.filterByDateRange("2026-02-28", "2026-02-28").size() == 1);
+
     cout << " PASSED: Tinh Recurr_expense va Simulate ok.\n";
 }
 
@@ -126,7 +139,8 @@ void testRq5_FilteringAndSearching() {
 void testRq6_ASCIIChart() {
     cout << "[TEST 6] Kiem tra ASCII Chart.\n";
     FinanceManager fm;
-    fm.loadSampleData();
+    assert(fm.loadSampleData());
+    assert(fm.getAccounts().size() == 3);
 
     // Goi render bieu do truc quan
     cout << "\n--- ASCII Monthly Chart ---\n";

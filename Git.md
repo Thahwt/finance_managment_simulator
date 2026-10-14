@@ -48,7 +48,7 @@ git commit -m "feat: initialize project structure, build scripts and common util
 
 # 4. Kết nối và đẩy lên GitHub (thay link repo của bạn)
 git remote add origin https://github.com/<username>/ProjectNhi.git
-git push -u origin main
+git push -u origin main --force
 ```
 3. **Mời các thành viên:** Vào GitHub Repo $\rightarrow$ **Settings** $\rightarrow$ **Collaborators** $\rightarrow$ Bấm **Add people** $\rightarrow$ Thêm tài khoản GitHub của 6 bạn còn lại.
 

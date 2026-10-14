@@ -17,9 +17,9 @@ private:
     vector<unique_ptr<BaseTransaction>> transactions;  // Danh sach cac giao dich
     Budget budget;                                     // Quan ly han muc ngan sach
     FinanceStorage storage;                            // Xu ly doc ghi file CSV
-    int nextId = 1;                                    // ID tu tang cho giao dich
+    int nextId = 1;                                    // ID tu tang cho giao dich 
 
-public:
+public: //Hàm - hành vi
     FinanceManager();
 
     // 1. Quan ly tai khoan (Multi-Account)
@@ -60,6 +60,12 @@ public:
     bool loadData(const string& filename = "data/finance_data.csv");
     bool exportQueryResults(const string& filename, const vector<const BaseTransaction*>& list);
 
-    // Nap du lieu mau ban dau
-    void loadSampleData();
+    // Nap du lieu demo tu file CSV rieng
+    bool loadSampleData();
+
+    // Xuat toan bo du lieu thanh chuoi JSON (dung cho Streamlit UI)
+    string toJson() const;
+
+    // Xuat ket qua canh bao ngan sach dang JSON
+    string budgetAlertJson(const string& category, int month, int year, double newAmount) const;
 };

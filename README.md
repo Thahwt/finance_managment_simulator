@@ -1,31 +1,62 @@
-# Hệ Thống Quản Lý Tài Chính Cá Nhân (Personal Financial Management System)
-> **Dành cho Sinh Viên & Freelancer | Viết bằng C++ (OOP Chuẩn)**
+# Hệ thống quản lý tài chính cá nhân
 
-Dự án phần mềm quản lý tài chính cá nhân toàn diện, gọn nhẹ, dễ hiểu, đáp ứng đầy đủ 7 yêu cầu kỹ thuật và nghiệp vụ theo chuẩn bài tập lớn / đồ án môn học Lập trình Hướng đối tượng (OOP).
+Ứng dụng có giao diện **Streamlit** và phần xử lý nghiệp vụ viết bằng **C++17**. Giao diện gọi chương trình C++ qua `finance_data.py`, nhận kết quả JSON và hiển thị số dư, giao dịch, ngân sách, lịch định kỳ và biểu đồ. Dữ liệu được lưu trong `data/finance_data.csv`.
 
----
+## Chạy ứng dụng
 
-## 📑 Bảng Đối Chiếu 7 Yêu Cầu Kỹ Thuật (Requirements Checklist)
+Yêu cầu: Windows, `g++` hỗ trợ C++17 (ví dụ MinGW/MSYS2), Python 3.9+ và `pip`. Chạy các lệnh sau **từ thư mục gốc của project**:
 
-| STT | Yêu Cầu Nghiệp Vụ (Business Requirement) | Hiện Thực Kỹ Thuật (Technical Implementation) | Vị Trí Code |
-|:---:|---|---|---|
-| **1** | **Transaction Types** (`Income`, `Expense`, `RecurringExpense`) | Lớp `BaseTransaction` trừu tượng với các lớp dẫn xuất kế thừa, áp dụng đa hình (`virtual`) | [`include/Transaction.h`](include/Transaction.h), [`src/Transaction.cpp`](src/Transaction.cpp) |
-| **2** | **Multi-Account Balances** (`Cash`, `Bank`, `E-Wallet`) | Lớp `Account` quản lý số dư riêng biệt cho từng tài khoản, nạp/rút tiền an toàn | [`include/Account.h`](include/Account.h), [`src/Account.cpp`](src/Account.cpp) |
-| **3** | **Category Budget Limits & Over-budget Alerts** | Lớp `Budget` kiểm tra ngưỡng chi tiêu (An toàn, Cảnh báo 80%, Báo động Vượt mức >100%) | [`include/Budget.h`](include/Budget.h), [`src/Budget.cpp`](src/Budget.cpp) |
-| **4** | **Recurring Transaction Scheduler Simulation** | Tính toán tự động tổng chi phí định kỳ hàng tháng và mô phỏng thực thi cho tháng mới | [`include/FinanceManager.h`](include/FinanceManager.h) (Hàm `calculateMonthlyFixedExpenses`, `executeRecurringExpensesForMonth`) |
-| **5** | **Filtering & Searching** (Date Range, Category, Account) | Các phương thức truy vấn chuyên biệt trong lớp `FinanceManager` | [`include/FinanceManager.h`](include/FinanceManager.h) (Hàm `filterByDateRange`, `filterByCategory`, `filterByAccount`) |
-| **6** | **ASCII Chart Visualization** | Sinh biểu đồ cột ASCII (`#`) so sánh chi tiêu theo tháng và theo danh mục | [`src/FinanceManager.cpp`](src/FinanceManager.cpp) (Hàm `renderMonthlySpendingChart`, `renderCategorySpendingChart`) |
-| **7** | **CSV Export & Data Load** | Đọc/ghi stream tệp tin CSV đa phần thông qua lớp `FinanceStorage` | [`include/FinanceStorage.h`](include/FinanceStorage.h), [`src/FinanceStorage.cpp`](src/FinanceStorage.cpp) |
+```powershell
+.\build.bat
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
 
----
+`build.bat` biên dịch `bin/FinanceApp.exe` và `bin/test_finance.exe`. Nếu chưa có `FinanceApp.exe`, giao diện sẽ báo lỗi backend và yêu cầu biên dịch. Ứng dụng đọc `data/finance_data.csv` đang có; nó **không tự nạp lại dữ liệu mẫu** khi khởi động. Nếu muốn bắt đầu với dữ liệu demo, vào **Cài đặt → Nạp dữ liệu mẫu**. Thao tác này thay thế dữ liệu hiện tại.
 
-## 📊 Sơ Đồ Lớp Kiến Trúc Hệ Thống (UML Class Diagram)
+Có thể kiểm tra backend trực tiếp (lệnh chỉ đọc):
+
+```powershell
+.\bin\FinanceApp.exe get-data
+```
+
+## Workflow của project
+
+```mermaid
+flowchart LR
+    U["Người dùng"] --> UI["app.py · Streamlit"]
+    UI --> B["finance_data.py · subprocess + JSON"]
+    B --> CLI["bin/FinanceApp.exe · src/main.cpp"]
+    CLI --> M["FinanceManager · Account / Transaction / Budget"]
+    M --> S["FinanceStorage"]
+    S <--> CSV["data/finance_data.csv"]
+    CLI -->|JSON| B
+    B -->|Dữ liệu mới| UI
+```
+
+1. `app.py` tải dữ liệu bằng `get-data` và giữ bản hiển thị trong `st.session_state`. Nút **Làm mới dữ liệu** đọc lại CSV qua backend.
+2. Khi người dùng thêm tài khoản, giao dịch hoặc hạn mức, `finance_data.py` gọi `FinanceApp.exe` bằng `subprocess`.
+3. Các lệnh C++ tạo `FinanceManager`, xử lý yêu cầu rồi trả JSON. Phần lớn lệnh đọc CSV đang dùng; riêng `load-sample` đọc `data/finance_data_fixed.csv` rồi ghi dữ liệu demo vào `data/finance_data.csv`. `get-data` chỉ đọc.
+4. Giao diện cập nhật session state từ JSON mới. Các màn hình tìm kiếm, bảng thống kê và biểu đồ Streamlit dùng dữ liệu này; C++ vẫn có các hàm lọc và biểu đồ ASCII riêng, nhưng giao diện web không gọi trực tiếp các hàm đó.
+
+## Vị trí hiện thực 7 yêu cầu
+
+| # | Yêu cầu trong đề | Hiện thực | Vị trí trong project |
+| --- | --- | --- | --- |
+| 1 | Transaction Types (`Income`, `Expense`, `RecurringExpense`) | `BaseTransaction` là lớp trừu tượng; các lớp con xác định loại và cách xuất CSV. | [`include/Transaction.h`](include/Transaction.h) (khai báo lớp), [`src/Transaction.cpp`](src/Transaction.cpp) (hiện thực), [`src/FinanceManager.cpp`](src/FinanceManager.cpp) (`addTransaction`). |
+| 2 | Multi-Account Balances (Cash, Bank, E-Wallet) | `Account` giữ số dư từng tài khoản; `deposit` và `withdraw` cộng/trừ tiền. | [`include/Account.h`](include/Account.h), [`src/Account.cpp`](src/Account.cpp), [`src/FinanceManager.cpp`](src/FinanceManager.cpp) (`addAccount`, `findAccount`, `getTotalBalance`). |
+| 3 | Category Budget Limits & Over-budget Alerts | `Budget` giữ hạn mức, kiểm tra ngưỡng 80% và vượt 100%; backend trả cảnh báo khi thêm khoản chi. | [`include/Budget.h`](include/Budget.h), [`src/Budget.cpp`](src/Budget.cpp) (`checkStatus`), [`src/FinanceManager.cpp`](src/FinanceManager.cpp) (`budgetAlertJson`), [`src/main.cpp`](src/main.cpp) (`add-transaction`). |
+| 4 | Recurring Transaction Scheduler Simulation | Tính tổng chi phí cố định hàng tháng, mô phỏng kỳ mới; CLI hỗ trợ xem trước và ghi nhận. | [`src/FinanceManager.cpp`](src/FinanceManager.cpp) (`calculateMonthlyFixedExpenses`, `executeRecurringExpensesForMonth`), [`src/main.cpp`](src/main.cpp) (`preview-recurring`, `simulate-recurring`), [`app.py`](app.py) (màn hình Chi phí định kỳ). |
+| 5 | Filtering & Searching (Date Range, Category, Account) | `FinanceManager` có các hàm truy vấn; giao diện Streamlit lọc dữ liệu JSON để hiển thị. | [`include/FinanceManager.h`](include/FinanceManager.h), [`src/FinanceManager.cpp`](src/FinanceManager.cpp) (`filterByDateRange`, `filterByCategory`, `filterByAccount`), [`app.py`](app.py) (Lịch sử và Tìm kiếm). |
+| 6 | ASCII Chart Visualization | C++ dựng biểu đồ cột ASCII cho chi tiêu theo tháng và danh mục. | [`src/FinanceManager.cpp`](src/FinanceManager.cpp) (`renderMonthlySpendingChart`, `renderCategorySpendingChart`); [`tests/test_finance.cpp`](tests/test_finance.cpp) kiểm tra biểu đồ. Giao diện web dùng Plotly trong [`app.py`](app.py). |
+| 7 | CSV Export & Data Load | `FinanceStorage` đọc/ghi ba phần tài khoản, ngân sách, giao dịch và xuất danh sách giao dịch. | [`include/FinanceStorage.h`](include/FinanceStorage.h), [`src/FinanceStorage.cpp`](src/FinanceStorage.cpp) (`saveToFile`, `loadFromFile`, `exportTransactionsOnly`), [`src/FinanceManager.cpp`](src/FinanceManager.cpp) (`saveData`, `loadData`), [`finance_data.py`](finance_data.py) (kiểm tra và nhập CSV trên web). |
+
+### Sơ đồ lớp C++ (UML)
 
 ```mermaid
 classDiagram
     direction TB
 
-    %% ================= HỆ THỐNG GIAO DỊCH =================
     class BaseTransaction {
         <<abstract>>
         #int id
@@ -34,251 +65,191 @@ classDiagram
         #string category
         #string accountName
         #string description
-        +BaseTransaction(id, date, amount, category, account, desc)
-        +virtual ~BaseTransaction()
-        +virtual string getType()*
-        +virtual void display()*
-        +virtual string toCSV()*
-        +getId() int
-        +getDate() string
-        +getAmount() double
-        +getCategory() string
-        +getAccountName() string
-        +getDescription() string
-    }
-
-    class Income {
-        +Income(id, date, amount, category, account, desc)
-        +string getType()
-        +void display()
-        +string toCSV()
-    }
-
-    class Expense {
-        +Expense(id, date, amount, category, account, desc)
-        +string getType()
-        +void display()
-        +string toCSV()
-    }
-
-    class RecurringExpense {
-        -string frequency
-        -int dueDay
-        +RecurringExpense(id, date, amount, category, account, desc, freq, dueDay)
-        +string getFrequency()
-        +int getDueDay()
-        +string getType()
-        +void display()
-        +string toCSV()
-    }
-
-    BaseTransaction <|-- Income : Kế thừa (Inheritance)
-    BaseTransaction <|-- Expense : Kế thừa (Inheritance)
-    Expense <|-- RecurringExpense : Kế thừa (Inheritance)
-
-    %% ================= TÀI KHOẢN =================
-    class Account {
-        -string name
-        -double balance
-        +Account(name, initialBalance)
-        +deposit(double amount) void
-        +withdraw(double amount) bool
-        +getName() string
-        +getBalance() double
+        +getType() string
         +display() void
         +toCSV() string
     }
+    class Income {
+        +getType() string
+        +display() void
+        +toCSV() string
+    }
+    class Expense {
+        +getType() string
+        +display() void
+        +toCSV() string
+    }
+    class RecurringExpense {
+        -string frequency
+        -int dueDay
+        +getFrequency() string
+        +getDueDay() int
+        +getType() string
+        +toCSV() string
+    }
+    BaseTransaction <|-- Income
+    BaseTransaction <|-- Expense
+    Expense <|-- RecurringExpense
 
-    %% ================= NGÂN SÁCH =================
+    class Account {
+        -string name
+        -double balance
+        +deposit(amount) void
+        +withdraw(amount) bool
+        +getBalance() double
+        +toCSV() string
+    }
     class BudgetStatus {
         <<enumeration>>
         SAFE
         WARNING
         OVERBUDGET
     }
-
     class Budget {
-        -map~string, double~ categoryLimits
+        -categoryLimits
         +setLimit(category, limit) void
-        +getLimit(category) double
-        +hasLimit(category) bool
-        +checkStatus(category, currentSpent) BudgetStatus
-        +getAlertMessage(category, currentSpent) string
-        +getAllLimits() map~string, double~
-        +clear() void
+        +checkStatus(category, spent) BudgetStatus
+        +getAllLimits() map
     }
+    Budget ..> BudgetStatus
 
-    Budget ..> BudgetStatus : Sử dụng (Dependency)
-
-    %% ================= LƯU TRỮ CSV =================
     class FinanceStorage {
         +saveToFile(filename, accounts, transactions, budget) bool
         +loadFromFile(filename, accounts, transactions, budget) bool
         +exportTransactionsOnly(filename, transactions) bool
     }
-
-    %% ================= ĐIỀU PHỐI CHÍNH =================
     class FinanceManager {
-        -vector~Account~ accounts
-        -vector~unique_ptr~BaseTransaction~~ transactions
-        -Budget budget
-        -FinanceStorage storage
+        -accounts
+        -transactions
+        -budget
+        -storage
         -int nextId
-        +FinanceManager()
         +addAccount(name, balance) void
-        +findAccount(name) Account*
-        +displayAccounts() void
-        +getTotalBalance() double
         +addTransaction(tx) bool
-        +generateNextId() int
-        +displayAllTransactions() void
-        +calculateCategorySpending(cat, month, year) double
-        +setBudgetLimit(cat, limit) void
-        +displayBudgetReport(month, year) void
-        +calculateMonthlyFixedExpenses() double
-        +displayRecurringPlan() void
+        +setBudgetLimit(category, limit) void
         +executeRecurringExpensesForMonth(year, month) int
         +filterByDateRange(startDate, endDate) vector
         +filterByCategory(category) vector
         +filterByAccount(accountName) vector
-        +printTransactionTable(list) void$
-        +renderMonthlySpendingChart(year) void
-        +renderCategorySpendingChart(month, year) void
         +saveData(filename) bool
         +loadData(filename) bool
-        +exportQueryResults(filename, list) bool
         +loadSampleData() void
+        +toJson() string
+        +budgetAlertJson(category, month, year, amount) string
     }
-
-    %% Quan hệ giữa Manager và các thành phần
-    FinanceManager "1" *-- "many" Account : Quản lý (Composition)
-    FinanceManager "1" *-- "many" BaseTransaction : Sở hữu qua unique_ptr
-    FinanceManager "1" *-- "1" Budget : Sở hữu (Composition)
-    FinanceManager "1" *-- "1" FinanceStorage : Sử dụng (Composition)
-
-    %% Quan hệ lưu trữ
-    FinanceStorage ..> Account : Đọc / Ghi
-    FinanceStorage ..> BaseTransaction : Đọc / Ghi
-    FinanceStorage ..> Budget : Đọc / Ghi
+    FinanceManager "1" *-- "many" Account
+    FinanceManager "1" *-- "many" BaseTransaction
+    FinanceManager "1" *-- "1" Budget
+    FinanceManager "1" *-- "1" FinanceStorage
+    FinanceStorage ..> Account
+    FinanceStorage ..> BaseTransaction
+    FinanceStorage ..> Budget
 ```
 
----
+### Các chức năng trên giao diện
 
-### 🧩 Ứng Dụng 4 Trụ Cột OOP Trong Dự Án:
+| Màn hình | Luồng sử dụng |
+| --- | --- |
+| **Tổng quan** | Xem số dư, thu chi, giao dịch gần đây và đi tới màn hình thêm giao dịch. |
+| **Thêm giao dịch** | Chọn `Income`, `Expense` hoặc `RecurringExpense`; backend cộng/trừ số dư, từ chối khoản chi nếu tài khoản không đủ tiền và trả cảnh báo ngân sách khi chạm 80% hoặc vượt hạn mức. |
+| **Lịch sử giao dịch** | Lọc theo loại, danh mục, tài khoản; tải CSV của bảng đang lọc. |
+| **Tài khoản** | Xem số dư và tạo tài khoản mới. |
+| **Ngân sách** | Xem mức chi theo danh mục và đặt hạn mức. |
+| **Chi phí định kỳ** | Chọn tháng/năm, xem trước giao dịch và số dư dự kiến, sau đó xác nhận để ghi nhận. |
+| **Tìm kiếm** | Tìm giao dịch theo khoảng ngày, danh mục hoặc tài khoản. |
+| **Biểu đồ** | Xem biểu đồ chi tiêu theo tháng và danh mục bằng Plotly. |
+| **Cài đặt** | Tải CSV đầy đủ, nhập CSV hoặc nạp dữ liệu mẫu. |
 
-1. **Tính Đóng Gói (Encapsulation)**:
-   - Các thuộc tính cốt lõi như `balance` (Account), `categoryLimits` (Budget), hay danh sách `accounts`, `transactions` (FinanceManager) đều ở phạm vi `private` / `protected`.
-   - Mọi thao tác truy xuất và sửa đổi dữ liệu bắt buộc phải qua các phương thức nghiệp vụ an toàn (`deposit`, `withdraw`, `setLimit`, `addTransaction`).
+### Luồng chi phí định kỳ
 
-2. **Tính Kế Thừa (Inheritance)**:
-   - `Income` và `Expense` kế thừa từ lớp cha `BaseTransaction`.
-   - `RecurringExpense` kế thừa từ `Expense` (tận dụng lại toàn bộ xử lý trừ tiền và danh mục chi tiêu, đồng thời mở rộng thêm `frequency` và `dueDay`).
+- Giao dịch định kỳ gốc được thêm ở màn hình **Thêm giao dịch**. Giao diện nhận tần suất `Monthly`, `Weekly`, `Yearly`, nhưng mô phỏng theo tháng hiện **chỉ áp dụng `Monthly`**.
+- **Xem trước** gọi `preview-recurring`: C++ tính trong bộ nhớ và trả các giao dịch/số dư dự kiến, không ghi CSV.
+- **Ghi nhận vào dữ liệu** gọi `simulate-recurring` sau khi người dùng xác nhận. Giao diện đọc lại dữ liệu trước khi ghi; nếu CSV đã thay đổi kể từ lúc xem trước, người dùng phải xem trước lại.
+- Mô phỏng chỉ tạo kỳ sau tháng bắt đầu, không tạo trùng khoản đã áp dụng, điều chỉnh ngày đến hạn 29–31 về ngày cuối tháng nếu cần và bỏ qua khoản không đủ số dư. Giao dịch tự tạo có tiền tố `[Tu dong]` trong mô tả.
 
-3. **Tính Đa Hình (Polymorphism)**:
-   - Định nghĩa các hàm ảo thuần ảo `= 0` (`getType`, `display`, `toCSV`) trong `BaseTransaction`.
-   - `FinanceManager` lưu trữ `vector<unique_ptr<BaseTransaction>>`. Khi gọi `transactions[i]->display()`, chương trình tự động điều hướng đến đúng hàm của lớp con tại thời điểm chạy (Runtime Dynamic Dispatch).
+## Dữ liệu và nhập/xuất
 
-4. **Tính Trừu Tượng (Abstraction)**:
-   - `BaseTransaction` đóng vai trò là giao diện trừu tượng, che giấu các chi tiết cài đặt riêng biệt của từng loại giao dịch.
+`data/finance_data.csv` gồm ba phần theo thứ tự:
 
----
-
-## 🏗️ Cấu Trúc Thư Mục Dự Án
-
+```text
+#ACCOUNTS
+Name,Balance
+...
+#BUDGETS
+Category,Limit
+...
+#TRANSACTIONS
+Type,Id,Date,Amount,Category,Account,Description,Frequency,DueDay
+...
 ```
+
+Số dư trong CSV là **số dư hiện tại**; khi tải file, backend không phát lại toàn bộ lịch sử giao dịch để tính số dư. Mỗi lần ghi giao dịch mới, `FinanceManager` cập nhật số dư rồi `FinanceStorage` ghi lại cả ba phần.
+
+- **Tải dữ liệu hiện tại** ở Cài đặt xuất đủ tài khoản, ngân sách và giao dịch theo định dạng trên. CSV ở **Lịch sử giao dịch** chỉ chứa bảng đã lọc, không dùng để nhập lại toàn bộ dữ liệu.
+- **Nạp CSV** ở Cài đặt kiểm tra định dạng, ngày, số tiền, ID và tài khoản tham chiếu; sau khi xác nhận, ứng dụng tạo bản sao `data/finance_data.backup-*.csv`, thay file hiện tại rồi kiểm tra backend đọc được. Nếu bước kiểm tra thất bại, ứng dụng khôi phục dữ liệu cũ.
+- **Nạp dữ liệu mẫu** gọi `load-sample`: đọc `data/finance_data_fixed.csv` và ghi đè `data/finance_data.csv`. Nếu thiếu file mẫu hoặc không thể lưu, backend báo lỗi. Nên tải bản CSV hiện tại trước nếu cần giữ dữ liệu.
+- Bộ đọc/ghi CSV dùng dấu phẩy làm ký tự phân cách, chưa hỗ trợ dấu phẩy bên trong tên, danh mục hoặc ghi chú.
+
+## Cây thư mục project
+
+```text
 ProjectNhi/
-│
-├── include/                 # Khai báo các Header file (.h)
-│   ├── Common.h             # Tiện ích định dạng tiền VND, cắt chuỗi, kiểm tra ngày tháng
-│   ├── Account.h            # Lớp Account (Số dư, nạp/rút tiền mặt, ngân hàng, ví)
-│   ├── Transaction.h        # BaseTransaction, Income, Expense, RecurringExpense
-│   ├── Budget.h             # Lớp Budget và enum BudgetStatus
-│   ├── FinanceStorage.h     # Lớp FinanceStorage (đọc/ghi file CSV)
-│   └── FinanceManager.h     # Bộ điều phối trung tâm và menu quản lý
-│
-├── src/                     # Mã nguồn thực thi (.cpp)
-│   ├── Account.cpp
-│   ├── Transaction.cpp
-│   ├── Budget.cpp
-│   ├── FinanceStorage.cpp
-│   ├── FinanceManager.cpp
-│   └── main.cpp             # Giao diện Console tương tác người dùng
-│
-├── tests/                   # Kiểm thử tự động (Unit / Integration Tests)
-│   └── test_finance.cpp     # Test suite kiểm tra tự động 100% 7 yêu cầu
-│
-├── data/                    # Thư mục chứa dữ liệu CSV
-│   └── finance_data.csv     # File dữ liệu mẫu ban đầu
-│
-├── bin/                     # Chứa file thực thi (.exe) sau khi biên dịch
-│   ├── FinanceApp.exe       # Ứng dụng chính
-│   └── test_finance.exe     # Ứng dụng test
-│
-├── build.bat                # Script biên dịch tự động trên Windows
-├── run_test.bat             # Script chạy kiểm thử tự động
-├── Git.md                   # Hướng dẫn chi tiết phân chia 7 người và các lệnh Git
-└── README.md                # Tài liệu hướng dẫn sử dụng chi tiết
+├── .streamlit/
+│   └── config.toml                  # Màu sắc và font mặc định của Streamlit
+├── include/                         # Khai báo lớp và hàm C++
+│   ├── Account.h                    # Giao diện tài khoản: số dư, nạp và rút tiền
+│   ├── Budget.h                     # Giao diện hạn mức và trạng thái cảnh báo
+│   ├── Common.h                     # Hàm dùng chung: tiền tệ, chuỗi và ngày
+│   ├── FinanceManager.h             # Giao diện điều phối nghiệp vụ tài chính
+│   ├── FinanceStorage.h             # Giao diện đọc, ghi và xuất CSV
+│   └── Transaction.h                # Các lớp giao dịch thu, chi và định kỳ
+├── src/                             # Hiện thực các lớp C++ và CLI
+│   ├── Account.cpp                  # Cập nhật số dư và xuất tài khoản ra CSV
+│   ├── Budget.cpp                   # Lưu hạn mức, tính mức cảnh báo
+│   ├── FinanceManager.cpp           # Xử lý giao dịch, ngân sách, định kỳ, lọc và JSON
+│   ├── FinanceStorage.cpp           # Đọc/ghi tài khoản, ngân sách, giao dịch trong CSV
+│   ├── Transaction.cpp              # Hiện thực các loại giao dịch và định dạng CSV
+│   └── main.cpp                     # Nhận lệnh CLI, gọi manager, trả JSON
+├── tests/                           # Kiểm thử tự động
+│   ├── test_finance.cpp             # Kiểm tra 7 nhóm chức năng C++
+│   ├── test_finance_import.py       # Kiểm tra nhập CSV, sao lưu và khôi phục
+│   ├── test_recurring_preview.py    # Kiểm tra xem trước và ghi nhận định kỳ
+│   └── test_sample_data.py          # Kiểm tra khôi phục demo từ CSV mẫu
+├── data/                            # Dữ liệu CSV
+│   ├── finance_data.csv             # File dữ liệu mặc định của ứng dụng
+│   └── finance_data_fixed.csv       # Nguồn dữ liệu demo cho lệnh load-sample
+├── bin/                             # Kết quả biên dịch từ build.bat
+│   ├── FinanceApp.exe               # Backend CLI được Streamlit gọi
+│   └── test_finance.exe             # Chương trình kiểm thử C++
+├── design/
+│   └── remaining-screens-preview.html # Bản xem trước giao diện bằng HTML
+├── app.py                           # Trang Streamlit và các thao tác người dùng
+├── finance_data.py                  # Gọi C++ qua subprocess; kiểm tra/nhập CSV
+├── style.css                        # Kiểu hiển thị cho giao diện Streamlit
+├── requirements.txt                 # Thư viện Python: Streamlit, pandas, Plotly
+├── build.bat                        # Biên dịch ứng dụng và bộ kiểm thử C++
+├── run_test.bat                     # Biên dịch lại và chạy kiểm thử C++
+├── .gitignore                       # Loại file build, dữ liệu test, file IDE khỏi Git
+├── AGENTS.md                        # Quy tắc làm việc và chỉnh sửa project
+├── Git.md                           # Hướng dẫn phối hợp nhóm và dùng Git
+├── LICENSE                          # Điều khoản cấp phép của project
+└── README.md                        # Tổng quan, cách chạy và workflow
 ```
 
----
+`BaseTransaction` là lớp trừu tượng; `Income` và `Expense` kế thừa từ đó, còn `RecurringExpense` kế thừa từ `Expense`. `FinanceManager` quản lý các tài khoản, giao dịch và ngân sách; `FinanceStorage` đọc/ghi CSV.
 
-## 🚀 Hướng Dẫn Biên Dịch & Chạy Chương Trình
+## Chạy các test
 
-### 1. Biên dịch toàn bộ dự án (`build.bat`)
-Mở PowerShell hoặc Command Prompt tại thư mục dự án và chạy:
+Chạy từ thư mục gốc của project. Biên dịch trước để các test tích hợp Python có thể gọi `bin/FinanceApp.exe`:
+
 ```powershell
 .\build.bat
-```
-*(Lệnh này tự động biên dịch cả `FinanceApp.exe` và `test_finance.exe`).*
-
-### 2. Biên dịch thủ công bằng `g++` (MinGW / MSYS2 / GCC)
-```powershell
-g++ -std=c++17 -Wall -Iinclude src/*.cpp -o bin/FinanceApp.exe
-```
-
-### 3. Chạy chương trình chính
-```powershell
-.\bin\FinanceApp.exe
-```
-
-### 4. Chạy bộ kiểm thử tự động 7 yêu cầu
-```powershell
 .\run_test.bat
-```
-Hoặc:
-```powershell
-.\bin\test_finance.exe
+python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
----
+- `run_test.bat` biên dịch lại `bin/test_finance.exe` và chạy `tests/test_finance.cpp`: 7 nhóm kiểm tra giao dịch, tài khoản, ngân sách, định kỳ, lọc, biểu đồ ASCII và lưu/đọc CSV.
+- `unittest discover` chạy `tests/test_finance_import.py` (kiểm tra định dạng, sao lưu/khôi phục và khả năng đọc CSV của C++), `tests/test_recurring_preview.py` (xem trước không ghi file và không tạo trùng khi ghi nhận) và `tests/test_sample_data.py` (đọc CSV mẫu, ghi đè dữ liệu đang dùng và xử lý khi thiếu file mẫu). Nếu thiếu `FinanceApp.exe`, các test tích hợp C++ sẽ bị bỏ qua.
+- Test C++ có thể tạo `data/test_storage.csv` (đã được bỏ qua trong Git); các test Python dùng thư mục tạm. Các test này không nạp lại hay ghi đè `data/finance_data.csv`.
 
-## 💡 Hướng Dẫn Sử Dụng Menu Console
-
-Khi khởi chạy, chương trình đã nạp sẵn bộ dữ liệu mẫu (Sample Data) dành cho sinh viên/freelancer với các tài khoản: `Cash`, `Bank`, `E-Wallet`, ngân sách và giao dịch mẫu.
-
-* **[1] Xem số dư các tài khoản**: Bảng số dư chi tiết từng ví/ngân hàng và tổng tài sản hiện có.
-* **[2] Thêm tài khoản / ví mới**: Tạo thêm các ví điện tử hoặc tài khoản ngân hàng mới.
-* **[3] Thêm giao dịch mới**: 
-  * Hỗ trợ 3 loại: `1. Thu nhập`, `2. Chi tiêu`, hoặc `3. Chi phí định kỳ`.
-  * Tự động cảnh báo khi sắp chạm hạn mức ngân sách hoặc vượt ngân sách.
-  * Tự động kiểm tra số dư và từ chối nếu không đủ tiền chi tiêu.
-* **[4] Xem toàn bộ lịch sử giao dịch**: Hiển thị bảng dạng lưới danh sách tất cả các giao dịch.
-* **[5] Lọc & Tìm kiếm**:
-  * Lọc theo khoảng ngày (`YYYY-MM-DD` đến `YYYY-MM-DD`).
-  * Lọc theo danh mục (`An uong`, `Thue nha`, `Giai tri`,...).
-  * Lọc theo tài khoản (`Cash`, `Bank`, `E-Wallet`).
-  * Hỗ trợ xuất trực tiếp kết quả lọc ra file CSV!
-* **[6] Quản lý Ngân sách**: Xem báo cáo phần trăm đã chi so với hạn mức (tự động nhân hạn mức theo tháng/năm) và chỉnh sửa hạn mức.
-* **[7] Mô phỏng Chi phí Định kỳ**:
-  * Xem danh sách và tổng số tiền cố định phải chi hàng tháng (tiền nhà, internet, gym, netflix,...).
-  * Mô phỏng tự động thanh toán các khoản định kỳ cho tháng mới.
-* **[8] Biểu đồ trực quan ASCII Chart**:
-  * Biểu đồ cột so sánh chi tiêu 12 tháng trong năm.
-  * Biểu đồ cột chi tiêu từng danh mục so với hạn mức ngân sách.
-* **[9] Lưu & Đọc CSV**: Lưu trữ toàn bộ dữ liệu vào file `.csv` hoặc khôi phục dữ liệu từ file.
-* **[10] Nạp lại dữ liệu mẫu**: Khôi phục lại dữ liệu mẫu ban đầu.
-
----
-
-## 👥 Phân Chia Công Việc Nhóm 7 Người (GitHub)
-Xem chi tiết kế hoạch phân chia 7 phần, thứ tự đẩy mã nguồn và câu lệnh Git đầy đủ tại: **[`Git.md`](Git.md)**.
+Xem [Git.md](Git.md) để biết hướng dẫn làm việc nhóm và Git.

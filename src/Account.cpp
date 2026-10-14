@@ -4,7 +4,7 @@
 
 using namespace std;
 
-Account::Account(const string& Name, double money)
+Account::Account(const string& Name, double money) //class::Ham
     : name(Name), balance(money) {}
 
 string Account::getName() const {

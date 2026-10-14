@@ -6,14 +6,15 @@ using namespace std;
  * Yêu cầu #2: Multi-Account Balances
  */
 class Account {
-private:
+private: //protected
     string name;       // Tên tài khoản (Cash, Bank, MoMo, ZaloPay,...)
-    double balance;    // Số dư hiện tại của tài khoản
+    double balance;    // Số dư hiện tại của tài khoản 
+    // thuộc tính
 
-public:
+public: // HÀNH VI
     // Hàm khởi tạo mặc định và có tham số
     Account(const string& accountName = "", double initialBalance = 0.0);
-
+    
     // Getters
     string getName() const;
     double getBalance() const;

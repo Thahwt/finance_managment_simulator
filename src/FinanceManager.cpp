@@ -15,15 +15,13 @@ void FinanceManager::addAccount(const string& name, double initialBalance) {
     // Kiem tra xem ten tai khoan da ton tai chua
     for (int i = 0; i < (int)accounts.size(); i++) {
         if (accounts[i].getName() == name) {
-            cout << "[!] Tai khoan [" << name << "] da ton tai!\n"; 
             return;
         }
     }
     // Them tai khoan moi vao danh sach
     accounts.push_back(Account(name, initialBalance));
-    cout << "[+] Da them tai khoan [" << name << "] voi so du: "
-         << Utils::formatCurrency(initialBalance) << "\n";
 }
+
 Account* FinanceManager::findAccount(const string& name) {
     for (int i = 0; i < (int)accounts.size(); i++) {
         if (accounts[i].getName() == name) {
@@ -75,29 +73,13 @@ bool FinanceManager::addTransaction(unique_ptr<BaseTransaction> tx) {
     } else {
         // Chi tieu thi tru tien, kiem tra so du
         if (!acc->withdraw(tx->getAmount())) {
-            cout << "[!] CANH BAO: Tai khoan [" << acc->getName() << "] khong du so du! (Hien co: " << Utils::formatCurrency(acc->getBalance()) << ", Can: " << Utils::formatCurrency(tx->getAmount()) << ")\n";
-            cout << "    Giao dich bi tu choi do khong du tien.\n";
             return false;
         }
-        // Buoc 3: Kiem tra han muc ngan sach theo thang
-        int txYear = stoi(tx->getDate().substr(0, 4));
-        int txMonth = stoi(tx->getDate().substr(5, 2));
-
-
-        double previousSpent = calculateCategorySpending(tx->getCategory(), txMonth, txYear);
-        double newTotalSpent = previousSpent + tx->getAmount();
-        string alert = budget.getAlertMessage(tx->getCategory(), newTotalSpent);
-        if (!alert.empty()) {
-            cout << "\n--------------------------------------------------------------\n";
-            cout << alert << "\n";
-            cout << "--------------------------------------------------------------\n";
-        }
     }
-    // Buoc 4: Cap nhat ID va dua vao danh sach giao dich
+    // Cap nhat ID va dua vao danh sach giao dich
     if (tx->getId() >= nextId) {
         nextId = tx->getId() + 1;
     }
-    cout << "[+] Giao dich da duoc ghi nhan thanh cong! (ID: " << tx->getId() << ")\n";
     transactions.push_back(move(tx));
     return true;
 }
@@ -150,7 +132,6 @@ void FinanceManager::printTransactionTable(const vector<const BaseTransaction*>&
 // ================= 3. QUAN LY NGAN SACH =================
 void FinanceManager::setBudgetLimit(const string& category, double limit) {
     budget.setLimit(category, limit);
-    cout << "[+] Da dat han muc ngan sach cho [" << category << "]: " << Utils::formatCurrency(limit) << " / thang\n";
 }
 
 const Budget& FinanceManager::getBudget() const {
@@ -244,22 +225,15 @@ void FinanceManager::displayBudgetReport(int month, int year) const {
 // ================= 4. MO PHONG CHI PHI DINH KY =================
 double FinanceManager::calculateMonthlyFixedExpenses() const {
     double total = 0.0;
-    vector<string> seen; // Luu cac ten khoan chi de tranh tinh trung
+    set<tuple<string, string, string, int>> seen;
     for (int i = 0; i < (int)transactions.size(); i++) {
         if (transactions[i]->getType() == "RecurringExpense") {
-            string desc = transactions[i]->getDescription();
-            // Kiem tra xem da tinh khoan nay chua
-            bool daTinh = false;
-            for (int j = 0; j < (int)seen.size(); j++) {
-                if (seen[j] == desc) {
-                    daTinh = true;
-                    break;
-                }
-            }
-            if (!daTinh) {
-                seen.push_back(desc);
-                total += transactions[i]->getAmount();
-            }
+            const RecurringExpense* rec = static_cast<const RecurringExpense*>(transactions[i].get());
+            if (rec->getFrequency() != "Monthly" ||
+                rec->getDescription().rfind("[Tu dong] ", 0) == 0) continue;
+            auto key = make_tuple(rec->getCategory(), rec->getAccountName(),
+                                  rec->getDescription(), rec->getDueDay());
+            if (seen.insert(key).second) total += rec->getAmount();
         }
     }
     return total;
@@ -300,50 +274,63 @@ void FinanceManager::displayRecurringPlan() const {
 }
 
 int FinanceManager::executeRecurringExpensesForMonth(int year, int month) {
-    vector<string> seen;
+    if (year < 1 || month < 1 || month > 12) return 0;
+
+    const string automaticPrefix = "[Tu dong] ";
+    const int daysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    int lastDay = daysInMonth[month - 1];
+    if (month == 2 && (year % 400 == 0 || (year % 4 == 0 && year % 100 != 0))) {
+        lastDay = 29;
+    }
+
+    set<tuple<string, string, string, int>> seen;
     vector<unique_ptr<BaseTransaction>> newTransactions;
-    // Loc ra cac khoan dinh ky goc
+    // Chi lay lich hang thang goc; giao dich tu dong khong tro thanh lich moi.
     for (int i = 0; i < (int)transactions.size(); i++) {
         if (transactions[i]->getType() == "RecurringExpense") {
-            string desc = transactions[i]->getDescription();
-            bool daCo = false;
-            for (int j = 0; j < (int)seen.size(); j++) {
-                if (seen[j] == desc) {
-                    daCo = true;
+            const RecurringExpense* rec = static_cast<const RecurringExpense*>(transactions[i].get());
+            const string desc = rec->getDescription();
+            if (rec->getFrequency() != "Monthly" || desc.rfind(automaticPrefix, 0) == 0 ||
+                !Utils::isValidDate(rec->getDate()) || rec->getDueDay() < 1 || rec->getDueDay() > 31) continue;
+
+            int startYear = stoi(rec->getDate().substr(0, 4));
+            int startMonth = stoi(rec->getDate().substr(5, 2));
+            if (year * 12 + month <= startYear * 12 + startMonth) continue;
+
+            auto key = make_tuple(rec->getCategory(), rec->getAccountName(),
+                                  desc, rec->getDueDay());
+            if (!seen.insert(key).second) continue;
+
+            int dueDay = min(rec->getDueDay(), lastDay);
+            string dateStr = to_string(year) + "-" + (month < 10 ? "0" : "") + to_string(month)
+                           + "-" + (dueDay < 10 ? "0" : "") + to_string(dueDay);
+            string newDescription = automaticPrefix + desc;
+            bool alreadyApplied = false;
+            for (int j = 0; j < (int)transactions.size(); j++) {
+                const BaseTransaction* existing = transactions[j].get();
+                if (existing->getType() == "RecurringExpense" && existing->getDate() == dateStr &&
+                    existing->getDescription() == newDescription &&
+                    existing->getAccountName() == rec->getAccountName() &&
+                    existing->getCategory() == rec->getCategory()) {
+                    alreadyApplied = true;
                     break;
                 }
             }
-            if (!daCo) {
-                seen.push_back(desc);
-                RecurringExpense* rec = (RecurringExpense*)transactions[i].get();
-                // Tao ngay moi: YYYY-MM-DD
-                string thangStr = (month < 10 ? "0" : "") + to_string(month);
-                string ngayStr = (rec->getDueDay() < 10 ? "0" : "") + to_string(rec->getDueDay());
-                string dateStr = to_string(year) + "-" + thangStr + "-" + ngayStr;
-                newTransactions.push_back(make_unique<RecurringExpense>(
-                    generateNextId(),
-                    dateStr,
-                    rec->getAmount(),
-                    rec->getCategory(),
-                    rec->getAccountName(),
-                    "[Tu dong] " + rec->getDescription(),
-                    rec->getFrequency(),
-                    rec->getDueDay()
-                ));
-            }
+            if (alreadyApplied) continue;
+
+            newTransactions.push_back(make_unique<RecurringExpense>(
+                generateNextId(), dateStr, rec->getAmount(), rec->getCategory(),
+                rec->getAccountName(), newDescription, rec->getFrequency(), rec->getDueDay()
+            ));
         }
     }
     // Ap dung cac giao dich vao tai khoan
     int appliedCount = 0;
-    cout << "\n[*] Dang mo phong ap dung chi phi dinh ky cho Thang " << month << "/" << year << ".\n";
     for (int i = 0; i < (int)newTransactions.size(); i++) {
-        cout << " -> Xu ly khoan: " << newTransactions[i]->getDescription() << " ("
-             << Utils::formatCurrency(newTransactions[i]->getAmount()) << " tu " << newTransactions[i]->getAccountName() << ")\n";
         if (addTransaction(move(newTransactions[i]))) {
             appliedCount++;
         }
     }
-    cout << "[+] Mo phong hoan tat! Da ghi nhan " << appliedCount << " khoan chi dinh ky.\n";
     return appliedCount;
 }
 
@@ -490,11 +477,7 @@ void FinanceManager::renderCategorySpendingChart(int month, int year) const {
 
 // ================= 7. XUAT & DOC DU LIEU CSV =================
 bool FinanceManager::saveData(const string& filename) {
-    if (storage.saveToFile(filename, accounts, transactions, budget)) {
-        cout << "[+] Da luu du lieu thanh cong vao: " << filename << "\n";
-        return true;
-    }
-    return false;
+    return storage.saveToFile(filename, accounts, transactions, budget);
 }
 bool FinanceManager::loadData(const string& filename) {
     if (storage.loadFromFile(filename, accounts, transactions, budget)) {
@@ -505,65 +488,111 @@ bool FinanceManager::loadData(const string& filename) {
                 nextId = transactions[i]->getId() + 1;
             }
         }
-        cout << "[+] Da nap thanh cong du lieu tu: " << filename << "\n";
-        cout << "    - So tai khoan: " << accounts.size() << "\n";
-        cout << "    - So giao dich: " << transactions.size() << "\n";
-        cout << "    - So han muc ngan sach: " << budget.getAllLimits().size() << "\n";
         return true;
     }
     return false;
 }
 bool FinanceManager::exportQueryResults(const string& filename, const vector<const BaseTransaction*>& list) {
-    if (storage.exportTransactionsOnly(filename, list)) {
-        cout << "[+] Da xuat " << list.size() << " giao dich ra file CSV: " << filename << "\n";
-        return true;
-    }
-    return false;
+    return storage.exportTransactionsOnly(filename, list);
 }
 
 
 // ================= Dữ liệu mẫu (Demo Data) =================
 
-void FinanceManager::loadSampleData() {
-    accounts.clear();
-    transactions.clear();
-    budget.clear();
-    nextId = 1;
+bool FinanceManager::loadSampleData() {
+    return loadData("data/finance_data_fixed.csv");
+}
 
-    // 1. Tài khoản (Cash, Bank, E-Wallet)
-    accounts.emplace_back("Cash", 1500000.0);
-    accounts.emplace_back("Bank", 20000000.0);
-    accounts.emplace_back("E-Wallet", 2500000.0);
+// ================= JSON EXPORT (dung cho Streamlit UI) =================
 
-    // 2. Hạn mức ngân sách (Budget Limits)
-    budget.setLimit("An uong", 3000000.0);
-    budget.setLimit("Thue nha", 3500000.0);
-    budget.setLimit("Giai tri", 1000000.0);
-    budget.setLimit("Tien ich", 800000.0);
-    budget.setLimit("Hoc tap", 1500000.0);
+// Ham thoat dau ngoac kep trong chuoi JSON
+static string jsonEscape(const string& s) {
+    string out;
+    for (int i = 0; i < (int)s.size(); i++) {
+        char c = s[i];
+        if (c == '"')  out += "\\\"";
+        else if (c == '\\') out += "\\\\";
+        else if (c == '\n') out += "\\n";
+        else if (c == '\r') out += "\\r";
+        else out += c;
+    }
+    return out;
+}
 
-    // 3. Các giao dịch mẫu
-    // Thu nhập
-    transactions.push_back(make_unique<Income>(generateNextId(), "2026-09-01", 15000000.0, "Luong", "Bank", "Luong cong ty thang 9"));
-    transactions.push_back(make_unique<Income>(generateNextId(), "2026-09-10", 3500000.0, "Freelance", "Bank", "Viet code web freelance"));
-    transactions.push_back(make_unique<Income>(generateNextId(), "2026-09-15", 500000.0, "Thuong", "E-Wallet", "Thuong du an mini"));
+string FinanceManager::toJson() const {
+    stringstream ss;
+    ss << "{";
 
-    // Chi tiêu thông thường
-    transactions.push_back(make_unique<Expense>(generateNextId(), "2026-09-02", 75000.0, "An uong", "Cash", "An trua com tam"));
-    transactions.push_back(make_unique<Expense>(generateNextId(), "2026-09-03", 250000.0, "An uong", "E-Wallet", "Di sieu thi mua do an"));
-    transactions.push_back(make_unique<Expense>(generateNextId(), "2026-09-08", 450000.0, "Giai tri", "E-Wallet", "Xem phim CGV & bap rang"));
-    transactions.push_back(make_unique<Expense>(generateNextId(), "2026-09-12", 800000.0, "Hoc tap", "Bank", "Khoa hoc lap trinh C++"));
-    transactions.push_back(make_unique<Expense>(generateNextId(), "2026-09-18", 2200000.0, "An uong", "Bank", "Lien hoan sinh nhat ban"));
+    // Accounts
+    ss << "\"accounts\":[";
+    for (int i = 0; i < (int)accounts.size(); i++) {
+        if (i > 0) ss << ",";
+        ss << "{\"name\":\"" << jsonEscape(accounts[i].getName()) << "\","
+           << "\"balance\":" << accounts[i].getBalance() << "}";
+    }
+    ss << "],";
 
-    // Chi phí định kỳ (RecurringExpense)
-    transactions.push_back(make_unique<RecurringExpense>(generateNextId(), "2026-09-05", 3200000.0, "Thue nha", "Bank", "Tien thue tro thang 9", "Monthly", 5));
-    transactions.push_back(make_unique<RecurringExpense>(generateNextId(), "2026-09-10", 250000.0, "Tien ich", "Bank", "Tien Internet Viettel", "Monthly", 10));
-    transactions.push_back(make_unique<RecurringExpense>(generateNextId(), "2026-09-15", 180000.0, "Giai tri", "E-Wallet", "Goi Netflix hang thang", "Monthly", 15));
-    transactions.push_back(make_unique<RecurringExpense>(generateNextId(), "2026-09-01", 350000.0, "Suc khoe", "Cash", "Tien ve thang tap Gym", "Monthly", 1));
+    // Budgets
+    map<string, double> limits = budget.getAllLimits();
+    ss << "\"budgets\":{";
+    bool firstB = true;
+    for (pair<string, double> p : limits) {
+        if (!firstB) ss << ",";
+        ss << "\"" << jsonEscape(p.first) << "\":" << p.second;
+        firstB = false;
+    }
+    ss << "},";
 
-    // Thêm các tháng trước để biểu đồ so sánh tháng có dữ liệu đa dạng
-    transactions.push_back(make_unique<Expense>(generateNextId(), "2026-07-15", 4200000.0, "An uong", "Bank", "Chi tieu thang 7"));
-    transactions.push_back(make_unique<Expense>(generateNextId(), "2026-08-10", 5600000.0, "An uong", "Bank", "Chi tieu thang 8"));
+    // Transactions
+    ss << "\"transactions\":[";
+    for (int i = 0; i < (int)transactions.size(); i++) {
+        if (i > 0) ss << ",";
+        const BaseTransaction* tx = transactions[i].get();
+        ss << "{\"type\":\"" << jsonEscape(tx->getType()) << "\","
+           << "\"id\":"      << tx->getId()        << ","
+           << "\"date\":\""  << jsonEscape(tx->getDate())        << "\","
+           << "\"amount\":"  << tx->getAmount()     << ","
+           << "\"category\":\"" << jsonEscape(tx->getCategory()) << "\","
+           << "\"account\":\"" << jsonEscape(tx->getAccountName()) << "\","
+           << "\"description\":\"" << jsonEscape(tx->getDescription()) << "\"";
 
-    cout << "[+] Da nap bo du lieu mau day du (Accounts, Budgets, Incomes, Expenses, RecurringExpenses)!\n";
+        // Them frequency va due_day neu la RecurringExpense
+        if (tx->getType() == "RecurringExpense") {
+            RecurringExpense* rec = (RecurringExpense*)tx;
+            ss << ",\"frequency\":\"" << jsonEscape(rec->getFrequency()) << "\","
+               << "\"due_day\":" << rec->getDueDay();
+        } else {
+            ss << ",\"frequency\":\"\",\"due_day\":1";
+        }
+        ss << "}";
+    }
+    ss << "]";
+
+    ss << "}";
+    return ss.str();
+}
+
+string FinanceManager::budgetAlertJson(const string& category, int month, int year, double newAmount) const {
+    double spent = calculateCategorySpending(category, month, year) + newAmount;
+    double limit = budget.getLimit(category);
+
+    stringstream ss;
+    ss << "{";
+    ss << "\"category\":\"" << jsonEscape(category) << "\",";
+    ss << "\"spent\":"      << spent << ",";
+    ss << "\"limit\":"      << limit << ",";
+    if (limit > 0) {
+        int pct = (int)((spent / limit) * 100);
+        ss << "\"percent\":"   << pct << ",";
+        if (spent > limit)
+            ss << "\"status\":\"over\"";
+        else if (pct >= 80)
+            ss << "\"status\":\"warning\"";
+        else
+            ss << "\"status\":\"ok\"";
+    } else {
+        ss << "\"percent\":0,\"status\":\"ok\"";
+    }
+    ss << "}";
+    return ss.str();
 }
