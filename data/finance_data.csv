@@ -1,15 +1,16 @@
 #ACCOUNTS
 Name,Balance
-Cash,845000.00
-Bank,57490000.00
+Cash,830000.00
+Bank,59090000.00
 E-Wallet,610000.00
 #BUDGETS
 Category,Limit
-Ăn uống,3000000.00
 Giải trí,1000000.00
 Học tập,1500000.00
 Thuê nhà,3500000.00
 Tiện ích,800000.00
+Valorant,500000.00
+Ăn uống,3000000.00
 #TRANSACTIONS
 Type,Id,Date,Amount,Category,Account,Description,Frequency,DueDay
 Income,1,2026-09-01,15000000.00,Lương,Bank,Lương công ty tháng 9.,,
@@ -50,3 +51,9 @@ Income,35,2026-10-01,15500000.00,Lương,Bank,Lương công ty tháng 10.,,
 Expense,36,2026-10-05,3200000.00,Thuê nhà,Bank,Tiền thuê trọ tháng 10.,,
 Expense,37,2026-10-07,380000.00,Ăn uống,E-Wallet,Mua thực phẩm cho tuần mới.,,
 Expense,38,2026-10-09,220000.00,Giải trí,Cash,Cà phê và gặp gỡ bạn bè.,,
+Expense,39,2026-10-14,15000.00,An u?ng,Cash,,,
+Income,40,2026-10-15,1000000.00,Vé s?,Bank,,,
+Income,41,2026-10-15,1000000.00,Vé s?,Bank,,,
+Income,42,2026-10-15,1000000.00,Ăn uống,Bank,,,
+Expense,43,2026-10-15,700000.00,Mua khóa học,Bank,,,
+Expense,44,2026-10-15,700000.00,Học tập,Bank,Mua khóa học,,

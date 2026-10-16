@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from finance_data import import_finance_csv, validate_finance_csv
+from finance_data import EXE_PATH, import_finance_csv, validate_finance_csv
 
 
 VALID_CSV = (
@@ -57,9 +57,9 @@ class FinanceImportTests(unittest.TestCase):
             self.assertEqual(list(Path(directory).glob("*.backup-*.csv")), [])
 
     def test_import_is_readable_by_cpp_backend(self):
-        executable = Path(__file__).resolve().parents[1] / "bin" / "FinanceApp.exe"
+        executable = EXE_PATH
         if not executable.exists():
-            self.skipTest("FinanceApp.exe has not been built")
+            self.skipTest(f"{executable.name} has not been built")
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
             data_file = Path(directory) / "data" / "finance_data.csv"
 
@@ -75,6 +75,49 @@ class FinanceImportTests(unittest.TestCase):
             self.assertIsNone(backup)
             self.assertEqual(loaded["accounts"][0]["name"], "Ví")
             self.assertEqual(loaded["transactions"][0]["description"], "Bữa sáng")
+
+    def test_unicode_command_line_is_saved_as_utf8(self):
+        if not EXE_PATH.exists():
+            self.skipTest(f"{EXE_PATH.name} has not been built")
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
+            result = subprocess.run(
+                [str(EXE_PATH), "add-account", "Ví số", "100"], cwd=directory,
+                capture_output=True, text=True, encoding="utf-8", check=True,
+            )
+            self.assertEqual(json.loads(result.stdout)["accounts"][0]["name"], "Ví số")
+            saved = (Path(directory) / "data" / "finance_data.csv").read_bytes()
+            self.assertIn("Ví số".encode("utf-8"), saved)
+            saved.decode("utf-8")
+
+    def test_legacy_ansi_byte_is_read_without_changing_csv(self):
+        if not EXE_PATH.exists():
+            self.skipTest(f"{EXE_PATH.name} has not been built")
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
+            data_dir = Path(directory) / "data"
+            data_dir.mkdir()
+            data_file = data_dir / "finance_data.csv"
+            legacy = (
+                b"#ACCOUNTS\nName,Balance\nCaf\xe9 " + "Việt".encode("utf-8") +
+                b",100.00\n#BUDGETS\nCategory,Limit\n"
+                b"#TRANSACTIONS\n"
+                b"Type,Id,Date,Amount,Category,Account,Description,Frequency,DueDay\n"
+            )
+            data_file.write_bytes(legacy)
+
+            result = subprocess.run(
+                [str(EXE_PATH), "get-data"], cwd=directory,
+                capture_output=True, text=True, encoding="utf-8", check=True,
+            )
+            self.assertEqual(json.loads(result.stdout)["accounts"][0]["name"], "Café Việt")
+            self.assertEqual(data_file.read_bytes(), legacy)
+
+            result = subprocess.run(
+                [str(EXE_PATH), "add-account", "Café Việt", "100"], cwd=directory,
+                capture_output=True, text=True, encoding="utf-8", check=True,
+            )
+            self.assertEqual(len(json.loads(result.stdout)["accounts"]), 1)
+            self.assertIn("Café Việt".encode("utf-8"), data_file.read_bytes())
+            data_file.read_bytes().decode("utf-8")
 
 
 if __name__ == "__main__":

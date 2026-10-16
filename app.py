@@ -17,7 +17,7 @@ from finance_data import (
     get_data, add_account, add_transaction,
     set_budget, simulate_recurring, preview_recurring, load_sample,
     validate_finance_csv, import_finance_csv,
-    format_vnd,
+    format_vnd, BUILD_COMMAND,
 )
 
 # ══════════════════════════════════════════════════════════════════
@@ -132,7 +132,7 @@ def d():
 # ══════════════════════════════════════════════════════════════════
 if st.session_state.get("cpp_error"):
     st.error(f"**Lỗi khởi động C++ backend:**\n\n{st.session_state.cpp_error}")
-    st.info("Chạy `build.bat` trong thư mục dự án, sau đó tải lại trang.")
+    st.info(f"Chạy `{BUILD_COMMAND}` trong thư mục dự án, sau đó tải lại trang.")
     st.stop()
 
 # ══════════════════════════════════════════════════════════════════

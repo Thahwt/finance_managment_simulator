@@ -1,6 +1,13 @@
 #include "FinanceManager.h"
 #include "Common.h"
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <iomanip>
+#include <iostream>
+#include <memory>
+#include <set>
+#include <sstream>
+#include <tuple>
+#include <utility>
 
 using namespace std;
 

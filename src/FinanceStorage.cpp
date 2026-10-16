@@ -1,10 +1,74 @@
 #include "FinanceStorage.h"
 #include "Common.h"
-#include <bits/stdc++.h>
-
+#include <exception>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <memory>
 
 using namespace std;
+
+// Giu nguyen chuoi UTF-8 hop le, chi doi byte Windows-1252 cu bi loi.
+static void appendUtf8(string& output, unsigned int codePoint) {
+    if (codePoint < 0x80) {
+        output += static_cast<char>(codePoint);
+    } else if (codePoint < 0x800) {
+        output += static_cast<char>(0xC0 | (codePoint >> 6));
+        output += static_cast<char>(0x80 | (codePoint & 0x3F));
+    } else {
+        output += static_cast<char>(0xE0 | (codePoint >> 12));
+        output += static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
+        output += static_cast<char>(0x80 | (codePoint & 0x3F));
+    }
+}
+
+static unsigned int windows1252CodePoint(unsigned char byte) {
+    static const unsigned int special[] = {
+        0x20AC, 0xFFFD, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+        0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0xFFFD, 0x017D, 0xFFFD,
+        0xFFFD, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+        0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0xFFFD, 0x017E, 0x0178,
+    };
+    return byte < 0xA0 ? special[byte - 0x80] : byte;
+}
+
+static string normalizeLegacyBytes(const string& text) {
+    string output;
+    for (size_t i = 0; i < text.size();) {
+        unsigned char first = static_cast<unsigned char>(text[i]);
+        if (first < 0x80) {
+            output += text[i++];
+            continue;
+        }
+
+        size_t length = 0;
+        if (first >= 0xC2 && first <= 0xDF) length = 2;
+        else if (first >= 0xE0 && first <= 0xEF) length = 3;
+        else if (first >= 0xF0 && first <= 0xF4) length = 4;
+
+        bool valid = length != 0 && i + length <= text.size();
+        for (size_t j = 1; valid && j < length; ++j) {
+            unsigned char next = static_cast<unsigned char>(text[i + j]);
+            valid = (next & 0xC0) == 0x80;
+        }
+        if (valid) {
+            unsigned char second = static_cast<unsigned char>(text[i + 1]);
+            valid = !(first == 0xE0 && second < 0xA0) &&
+                    !(first == 0xED && second > 0x9F) &&
+                    !(first == 0xF0 && second < 0x90) &&
+                    !(first == 0xF4 && second > 0x8F);
+        }
+        if (valid) {
+            output.append(text, i, length);
+            i += length;
+        } else {
+            appendUtf8(output, windows1252CodePoint(first));
+            ++i;
+        }
+    }
+    return output;
+}
 
 bool FinanceStorage::saveToFile(const string& filename,
                                 const vector<Account>& accounts,
@@ -68,7 +132,7 @@ bool FinanceStorage::loadFromFile(const string& filename,
 
     string line;
     while (getline(inFile, line)) {
-        line = Utils::trim(line);
+        line = Utils::trim(normalizeLegacyBytes(line));
         if (line.empty()) continue;
 
         // Nhan dien phan section

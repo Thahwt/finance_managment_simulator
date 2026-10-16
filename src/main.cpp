@@ -2,21 +2,28 @@
  * main.cpp  –  CLI Entry Point cho FinanceApp
  *
  * Cach dung:
- *   FinanceApp.exe get-data
- *   FinanceApp.exe add-account <name> <balance>
- *   FinanceApp.exe add-transaction <type> <date> <amount> <category> <account> <desc> [freq] [dueDay]
- *   FinanceApp.exe set-budget <category> <limit>
- *   FinanceApp.exe simulate-recurring <year> <month>
- *   FinanceApp.exe preview-recurring <year> <month>
- *   FinanceApp.exe load-sample
+ *   FinanceApp get-data
+ *   FinanceApp add-account <name> <balance>
+ *   FinanceApp add-transaction <type> <date> <amount> <category> <account> <desc> [freq] [dueDay]
+ *   FinanceApp set-budget <category> <limit>
+ *   FinanceApp simulate-recurring <year> <month>
+ *   FinanceApp preview-recurring <year> <month>
+ *   FinanceApp load-sample
+ *   (Ten file tren Windows la FinanceApp.exe.)
  *
  * Moi lenh doc/ghi CSV theo nhu cau va in ket qua JSON ra stdout.
  * Streamlit goi qua subprocess va doc JSON tu stdout.
  */
 
-#include <bits/stdc++.h>
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <vector>
 #ifdef _WIN32
 #include <windows.h>
+#include <shellapi.h>
 #endif
 #include "FinanceManager.h"
 
@@ -32,6 +39,41 @@ static void errJson(const string& message) {
 int main(int argc, char* argv[]) {
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
+
+    // MinGW tao argv theo ANSI; lay command line Unicode de giu nguyen tieng Viet.
+    int wideArgc = 0;
+    LPWSTR* wideArgv = CommandLineToArgvW(GetCommandLineW(), &wideArgc);
+    if (wideArgv == nullptr) {
+        cerr << "Khong the doc tham so dong lenh Unicode.\n";
+        return 1;
+    }
+    vector<string> utf8Args;
+    utf8Args.reserve(wideArgc);
+    for (int i = 0; i < wideArgc; ++i) {
+        int length = WideCharToMultiByte(CP_UTF8, 0, wideArgv[i], -1,
+                                          nullptr, 0, nullptr, nullptr);
+        if (length == 0) {
+            LocalFree(wideArgv);
+            cerr << "Khong the chuyen tham so sang UTF-8.\n";
+            return 1;
+        }
+        string value(length, '\0');
+        if (WideCharToMultiByte(CP_UTF8, 0, wideArgv[i], -1,
+                                value.data(), length, nullptr, nullptr) == 0) {
+            LocalFree(wideArgv);
+            cerr << "Khong the chuyen tham so sang UTF-8.\n";
+            return 1;
+        }
+        value.pop_back();  // Bo byte null cuoi chuoi.
+        utf8Args.push_back(value);
+    }
+    LocalFree(wideArgv);
+
+    vector<char*> utf8Argv;
+    utf8Argv.reserve(utf8Args.size());
+    for (string& arg : utf8Args) utf8Argv.push_back(arg.data());
+    argc = wideArgc;
+    argv = utf8Argv.data();
 #endif
 
     // Khong co lenh -> in huong dan

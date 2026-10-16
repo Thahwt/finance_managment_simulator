@@ -4,14 +4,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from finance_data import EXE_PATH
 
-EXECUTABLE = Path(__file__).resolve().parents[1] / "bin" / "FinanceApp.exe"
+EXECUTABLE = EXE_PATH
 
 
 class SampleDataTests(unittest.TestCase):
     def setUp(self):
         if not EXECUTABLE.exists():
-            self.skipTest("FinanceApp.exe has not been built")
+            self.skipTest(f"{EXECUTABLE.name} has not been built")
 
     def test_load_sample_reads_csv_and_replaces_current_data(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:

@@ -4,7 +4,9 @@
 
 ## Chạy ứng dụng
 
-Yêu cầu: Windows, `g++` hỗ trợ C++17 (ví dụ MinGW/MSYS2), Python 3.9+ và `pip`. Chạy các lệnh sau **từ thư mục gốc của project**:
+Yêu cầu chung: trình biên dịch C++17, Python 3.9+ và `pip`. Chạy các lệnh sau **từ thư mục gốc của project**.
+
+**Windows** (cần `g++`, ví dụ MinGW/MSYS2):
 
 ```powershell
 .\build.bat
@@ -12,7 +14,19 @@ python -m pip install -r requirements.txt
 python -m streamlit run app.py
 ```
 
-`build.bat` biên dịch `bin/FinanceApp.exe` và `bin/test_finance.exe`. Nếu chưa có `FinanceApp.exe`, giao diện sẽ báo lỗi backend và yêu cầu biên dịch. Ứng dụng đọc `data/finance_data.csv` đang có; nó **không tự nạp lại dữ liệu mẫu** khi khởi động. Nếu muốn bắt đầu với dữ liệu demo, vào **Cài đặt → Nạp dữ liệu mẫu**. Thao tác này thay thế dữ liệu hiện tại.
+**macOS** (cần Xcode Command Line Tools để có trình biên dịch `c++`):
+
+```bash
+bash build.sh
+python3 -m pip install -r requirements.txt
+python3 -m streamlit run app.py
+```
+
+`build.bat` tạo `bin/FinanceApp.exe` và `bin/test_finance.exe` trên Windows; `build.sh` tạo `bin/FinanceApp` và `bin/test_finance` trên macOS. Có thể chọn trình biên dịch khác bằng `CXX`, ví dụ `CXX=clang++ bash build.sh`. Nếu chưa có backend, giao diện sẽ báo lỗi và yêu cầu biên dịch. Ứng dụng đọc `data/finance_data.csv` đang có; nó **không tự nạp lại dữ liệu mẫu** khi khởi động. Nếu muốn bắt đầu với dữ liệu demo, vào **Cài đặt → Nạp dữ liệu mẫu**. Thao tác này thay thế dữ liệu hiện tại.
+
+Trên Windows, backend nhận tham số tiếng Việt ở dạng UTF-8. Nếu CSV cũ chứa byte ANSI, backend chuyển chúng sang UTF-8 trong bộ nhớ khi đọc; lệnh `get-data` không ghi đè CSV. Lần lưu dữ liệu kế tiếp sẽ ghi lại CSV bằng UTF-8. Những ký tự đã bị Windows thay bằng dấu `?` trước đó không thể tự khôi phục.
+
+Các file thực thi trong `bin/` bị bỏ qua trong Git, nên **máy mới clone repo phải chạy script build của hệ điều hành** trước khi mở Streamlit. Nếu build lỗi, kiểm tra `g++ --version` trên Windows hoặc `c++ --version` trên macOS.
 
 Có thể kiểm tra backend trực tiếp (lệnh chỉ đọc):
 
@@ -20,13 +34,15 @@ Có thể kiểm tra backend trực tiếp (lệnh chỉ đọc):
 .\bin\FinanceApp.exe get-data
 ```
 
+Trên macOS dùng `./bin/FinanceApp get-data`.
+
 ## Workflow của project
 
 ```mermaid
 flowchart LR
     U["Người dùng"] --> UI["app.py · Streamlit"]
     UI --> B["finance_data.py · subprocess + JSON"]
-    B --> CLI["bin/FinanceApp.exe · src/main.cpp"]
+    B --> CLI["bin/FinanceApp hoặc FinanceApp.exe · src/main.cpp"]
     CLI --> M["FinanceManager · Account / Transaction / Budget"]
     M --> S["FinanceStorage"]
     S <--> CSV["data/finance_data.csv"]
@@ -35,7 +51,7 @@ flowchart LR
 ```
 
 1. `app.py` tải dữ liệu bằng `get-data` và giữ bản hiển thị trong `st.session_state`. Nút **Làm mới dữ liệu** đọc lại CSV qua backend.
-2. Khi người dùng thêm tài khoản, giao dịch hoặc hạn mức, `finance_data.py` gọi `FinanceApp.exe` bằng `subprocess`.
+2. Khi người dùng thêm tài khoản, giao dịch hoặc hạn mức, `finance_data.py` gọi `FinanceApp.exe` trên Windows hoặc `FinanceApp` trên macOS bằng `subprocess`.
 3. Các lệnh C++ tạo `FinanceManager`, xử lý yêu cầu rồi trả JSON. Phần lớn lệnh đọc CSV đang dùng; riêng `load-sample` đọc `data/finance_data_fixed.csv` rồi ghi dữ liệu demo vào `data/finance_data.csv`. `get-data` chỉ đọc.
 4. Giao diện cập nhật session state từ JSON mới. Các màn hình tìm kiếm, bảng thống kê và biểu đồ Streamlit dùng dữ liệu này; C++ vẫn có các hàm lọc và biểu đồ ASCII riêng, nhưng giao diện web không gọi trực tiếp các hàm đó.
 
@@ -212,15 +228,16 @@ ProjectNhi/
 │   └── main.cpp                     # Nhận lệnh CLI, gọi manager, trả JSON
 ├── tests/                           # Kiểm thử tự động
 │   ├── test_finance.cpp             # Kiểm tra 7 nhóm chức năng C++
+│   ├── test_finance_bridge.py       # Kiểm tra lỗi và JSON khi Python gọi C++
 │   ├── test_finance_import.py       # Kiểm tra nhập CSV, sao lưu và khôi phục
 │   ├── test_recurring_preview.py    # Kiểm tra xem trước và ghi nhận định kỳ
 │   └── test_sample_data.py          # Kiểm tra khôi phục demo từ CSV mẫu
 ├── data/                            # Dữ liệu CSV
 │   ├── finance_data.csv             # File dữ liệu mặc định của ứng dụng
 │   └── finance_data_fixed.csv       # Nguồn dữ liệu demo cho lệnh load-sample
-├── bin/                             # Kết quả biên dịch từ build.bat
-│   ├── FinanceApp.exe               # Backend CLI được Streamlit gọi
-│   └── test_finance.exe             # Chương trình kiểm thử C++
+├── bin/                             # Kết quả biên dịch, không lưu trong Git
+│   ├── FinanceApp(.exe)             # Backend CLI, có .exe trên Windows
+│   └── test_finance(.exe)           # Chương trình kiểm thử C++
 ├── design/
 │   └── remaining-screens-preview.html # Bản xem trước giao diện bằng HTML
 ├── app.py                           # Trang Streamlit và các thao tác người dùng
@@ -228,6 +245,7 @@ ProjectNhi/
 ├── style.css                        # Kiểu hiển thị cho giao diện Streamlit
 ├── requirements.txt                 # Thư viện Python: Streamlit, pandas, Plotly
 ├── build.bat                        # Biên dịch ứng dụng và bộ kiểm thử C++
+├── build.sh                         # Biên dịch ứng dụng và bộ kiểm thử trên macOS
 ├── run_test.bat                     # Biên dịch lại và chạy kiểm thử C++
 ├── .gitignore                       # Loại file build, dữ liệu test, file IDE khỏi Git
 ├── AGENTS.md                        # Quy tắc làm việc và chỉnh sửa project
@@ -240,7 +258,7 @@ ProjectNhi/
 
 ## Chạy các test
 
-Chạy từ thư mục gốc của project. Biên dịch trước để các test tích hợp Python có thể gọi `bin/FinanceApp.exe`:
+Chạy từ thư mục gốc của project. Biên dịch trước để các test tích hợp Python có thể gọi backend:
 
 ```powershell
 .\build.bat
@@ -248,8 +266,16 @@ Chạy từ thư mục gốc của project. Biên dịch trước để các tes
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
+Trên macOS:
+
+```bash
+bash build.sh
+./bin/test_finance
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+```
+
 - `run_test.bat` biên dịch lại `bin/test_finance.exe` và chạy `tests/test_finance.cpp`: 7 nhóm kiểm tra giao dịch, tài khoản, ngân sách, định kỳ, lọc, biểu đồ ASCII và lưu/đọc CSV.
-- `unittest discover` chạy `tests/test_finance_import.py` (kiểm tra định dạng, sao lưu/khôi phục và khả năng đọc CSV của C++), `tests/test_recurring_preview.py` (xem trước không ghi file và không tạo trùng khi ghi nhận) và `tests/test_sample_data.py` (đọc CSV mẫu, ghi đè dữ liệu đang dùng và xử lý khi thiếu file mẫu). Nếu thiếu `FinanceApp.exe`, các test tích hợp C++ sẽ bị bỏ qua.
+- `unittest discover` chạy `tests/test_finance_bridge.py` (tên backend theo hệ điều hành, JSON và trường hợp không có `stdout`), `tests/test_finance_import.py` (định dạng CSV, sao lưu/khôi phục, tham số Unicode và byte ANSI cũ), `tests/test_recurring_preview.py` (xem trước không ghi file và không tạo trùng khi ghi nhận) và `tests/test_sample_data.py` (đọc CSV mẫu, ghi đè dữ liệu đang dùng và xử lý khi thiếu file mẫu). Nếu chưa build backend, các test tích hợp C++ sẽ bị bỏ qua.
 - Test C++ có thể tạo `data/test_storage.csv` (đã được bỏ qua trong Git); các test Python dùng thư mục tạm. Các test này không nạp lại hay ghi đè `data/finance_data.csv`.
 
 Xem [Git.md](Git.md) để biết hướng dẫn làm việc nhóm và Git.

@@ -5,12 +5,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from finance_data import EXE_PATH
+
 
 class RecurringPreviewTests(unittest.TestCase):
     def test_preview_does_not_save_and_apply_is_idempotent(self):
-        executable = Path(__file__).resolve().parents[1] / "bin" / "FinanceApp.exe"
+        executable = EXE_PATH
         if not executable.exists():
-            self.skipTest("FinanceApp.exe has not been built")
+            self.skipTest(f"{executable.name} has not been built")
 
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as directory:
             data_file = Path(directory) / "data" / "finance_data.csv"

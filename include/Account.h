@@ -1,5 +1,5 @@
 #pragma once
-#include <bits/stdc++.h>
+#include <string>
 using namespace std;
 
 /* Class quản lý tài khoản tài chính (Tiền mặt Cash, Ngân hàng Bank, Ví điện tử E-Wallet)

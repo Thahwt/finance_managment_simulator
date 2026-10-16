@@ -1,5 +1,8 @@
 #pragma once
-#include <bits/stdc++.h>
+#include <iomanip>
+#include <sstream>
+#include <string>
+#include <vector>
 
 using namespace std;
 

@@ -2,6 +2,8 @@
 bin/*.exe
 bin/*.out
 bin/*.app
+bin/FinanceApp
+bin/test_finance
 *.exe
 *.o
 *.obj

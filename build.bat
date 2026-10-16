@@ -8,23 +8,23 @@ echo ========================================================
 
 echo.
 echo [1/2] Bien dich Ung dung Chinh (FinanceApp.exe)...
-g++ -std=c++17 -Wall -Iinclude src/Account.cpp src/Transaction.cpp src/Budget.cpp src/FinanceStorage.cpp src/FinanceManager.cpp src/main.cpp -o bin/FinanceApp.exe
+g++ -std=c++17 -Wall -Iinclude src/Account.cpp src/Transaction.cpp src/Budget.cpp src/FinanceStorage.cpp src/FinanceManager.cpp src/main.cpp -o bin/FinanceApp.exe -lshell32
 
-if %ERRORLEVEL% equ 0 (
-    echo [THANH CONG] Da tao file: bin\FinanceApp.exe
-) else (
+if errorlevel 1 (
     echo [LOI] Bien dich FinanceApp that bai!
+    exit /b 1
 )
+echo [THANH CONG] Da tao file: bin\FinanceApp.exe
 
 echo.
 echo [2/2] Bien dich Bo Test Kiem Thu (test_finance.exe)...
 g++ -std=c++17 -Wall -Iinclude src/Account.cpp src/Transaction.cpp src/Budget.cpp src/FinanceStorage.cpp src/FinanceManager.cpp tests/test_finance.cpp -o bin/test_finance.exe
 
-if %ERRORLEVEL% equ 0 (
-    echo [THANH CONG] Da tao file: bin\test_finance.exe
-) else (
+if errorlevel 1 (
     echo [LOI] Bien dich test_finance that bai!
+    exit /b 1
 )
+echo [THANH CONG] Da tao file: bin\test_finance.exe
 
 echo.
 echo ========================================================
